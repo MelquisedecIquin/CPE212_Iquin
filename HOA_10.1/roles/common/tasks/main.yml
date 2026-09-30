@@ -1,0 +1,37 @@
+---
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - gnupg
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download Elastic GPG key
+  ansible.builtin.get_url:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    dest: /etc/apt/keyrings/elastic.asc
+    mode: "0644"
+
+- name: Add Elastic APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/elastic.asc] https://artifacts.elastic.co/packages/{{ elastic_major }}.x/apt stable main"
+    filename: elastic
+    state: present
+
+- name: Set vm.max_map_count
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    sysctl_set: true
+    reload: true
+    state: present

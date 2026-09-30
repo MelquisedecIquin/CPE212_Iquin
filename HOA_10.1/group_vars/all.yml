@@ -1,0 +1,9 @@
+---
+elastic_major: "8"
+es_host: "{{ hostvars[groups['elasticsearch'][0]].ansible_host }}"
+es_port: 9200
+kibana_port: 5601
+logstash_beats_port: 5044
+es_heap: "1g"
+elastic_password: "ChangeMe-Elastic-123"
+kibana_system_password: "ChangeMe-Kibana-123"

@@ -1,0 +1,38 @@
+---
+- name: Install Kibana
+  ansible.builtin.apt:
+    name: kibana
+    state: present
+
+- name: Create certs directory
+  ansible.builtin.file:
+    path: /etc/kibana/certs
+    state: directory
+    owner: root
+    group: kibana
+    mode: "0750"
+
+- name: Copy Elasticsearch CA certificate
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/files/http_ca.crt"
+    dest: /etc/kibana/certs/http_ca.crt
+    owner: root
+    group: kibana
+    mode: "0640"
+  notify: Restart kibana
+
+- name: Configure Kibana
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: root
+    group: kibana
+    mode: "0660"
+  notify: Restart kibana
+
+- name: Enable and start Kibana
+  ansible.builtin.systemd:
+    name: kibana
+    enabled: true
+    state: started
+    daemon_reload: true

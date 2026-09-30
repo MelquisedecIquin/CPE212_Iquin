@@ -1,0 +1,67 @@
+---
+- name: Install Elasticsearch
+  ansible.builtin.apt:
+    name: elasticsearch
+    state: present
+
+- name: Set network.host
+  ansible.builtin.lineinfile:
+    path: /etc/elasticsearch/elasticsearch.yml
+    regexp: '^#?network.host:'
+    line: "network.host: 0.0.0.0"
+  notify: Restart elasticsearch
+
+- name: Set single-node discovery
+  ansible.builtin.lineinfile:
+    path: /etc/elasticsearch/elasticsearch.yml
+    regexp: '^#?discovery.type:'
+    line: "discovery.type: single-node"
+  notify: Restart elasticsearch
+
+- name: Set JVM heap size
+  ansible.builtin.copy:
+    dest: /etc/elasticsearch/jvm.options.d/heap.options
+    content: |
+      -Xms{{ es_heap }}
+      -Xmx{{ es_heap }}
+    mode: "0644"
+  notify: Restart elasticsearch
+
+- name: Enable and start Elasticsearch
+  ansible.builtin.systemd:
+    name: elasticsearch
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Wait for Elasticsearch port
+  ansible.builtin.wait_for:
+    host: "{{ es_host }}"
+    port: "{{ es_port }}"
+    timeout: 180
+
+- name: Set built-in user passwords (first run only)
+  ansible.builtin.shell: |
+    set -eo pipefail
+    API=https://{{ es_host }}:{{ es_port }}
+    CA=/etc/elasticsearch/certs/http_ca.crt
+    TMP=$(/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b -a -s | tail -n1)
+    curl -sf --cacert $CA -u "elastic:$TMP" -X POST "$API/_security/user/kibana_system/_password" \
+      -H 'Content-Type: application/json' -d '{"password":"{{ kibana_system_password }}"}'
+    curl -sf --cacert $CA -u "elastic:$TMP" -X POST "$API/_security/user/elastic/_password" \
+      -H 'Content-Type: application/json' -d '{"password":"{{ elastic_password }}"}'
+    touch /etc/elasticsearch/.passwords_set
+  args:
+    executable: /bin/bash
+    creates: /etc/elasticsearch/.passwords_set
+  register: pw_result
+  until: pw_result.rc == 0
+  retries: 10
+  delay: 10
+  no_log: true
+
+- name: Fetch the HTTP CA certificate to the controller
+  ansible.builtin.fetch:
+    src: /etc/elasticsearch/certs/http_ca.crt
+    dest: "{{ playbook_dir }}/files/http_ca.crt"
+    flat: true

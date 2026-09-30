@@ -1,0 +1,15 @@
+input {
+  beats {
+    port => {{ logstash_beats_port }}
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["https://{{ es_host }}:{{ es_port }}"]
+    user => "elastic"
+    password => "{{ elastic_password }}"
+    ssl_certificate_authorities => ["/etc/logstash/certs/http_ca.crt"]
+    index => "logs-%{+YYYY.MM.dd}"
+  }
+}
